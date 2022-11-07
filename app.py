@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 
 import urllib.request
 
-UPLOAD_FOLDER =  'C:/Users/KIM/PycharmProjects/salesProperty/pictures/'
+UPLOAD_FOLDER = 'C:/Users/KIM/PycharmProjects/salesProperty/Property_Booking/pictures/'
 ALLOWED_EXTENSIONS = set(['jpg', 'jpeg', 'png', 'gif'])
 
 
@@ -23,7 +23,6 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 bcrypt = Bcrypt(app)
 mail = Mail(app)
-
 
 app.secret_key = 'Cindy1648'
 
@@ -174,85 +173,45 @@ def register():
 @app.route('/property', methods=['POST', 'GET'])
 def propery():
     try:
-        _json = request.json
-        file = request.files
-        _title = _json['title']
-        _category = _json['category']
-        _house_type = _json['house_type']
-        _amenity = _json['amenity']
-        _county = _json['county']
-        _price = _json['price']
-        _image = file['image']
+        _form = request.form
+        # file = request.files
+        _title = _form['title']
+        _category = _form['category']
+        _house_type = _form['house_type']
+        _amenity = _form['amenity']
+        _county = _form['county']
+        _price = _form['price']
+        image = request.files['image']
 
-        if _title and _category and _house_type and _amenity and _county and _price and _image:
+        if _title and _category and _house_type and _amenity and _county and _price and image:
             cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
             cursor.execute('SELECT * FROM property WHERE title = % s', (_title,))
             account = cursor.fetchone()
             if account:
-                return jsonify({'message': 'The property already exists'})
+                return 'The property already exists'
             elif _category != 'commercial' and _category != 'residential':
-                return jsonify({'message': 'System requires you to define property as residential or commercial'})
+                return 'System requires you to define property as residential or commercial'
             elif _house_type != 'single room' and _house_type != 'bed sitter' and _house_type != 'studio':
-                return jsonify({'message': 'The property should be a single room or a bed sitter or a studio'})
+                return 'The property should be a single room or a bed sitter or a studio'
             elif not _title or not _category or not _house_type or not _amenity or not _county or not _price:
-                return jsonify({'message': 'please enter the necessary credentials'})
-            # elif _image:
-            #     _image.save(secure_filename(_image.filename))
-            #     return jsonify({'message': 'File successfully uploaded'})
+                return 'please enter the necessary credentials'
 
-            files = request.files.getlist('files[]')
-            for _image in files:
-                if _image and allowed_file(_image.filename):
-                    filename = secure_filename(_image.filename)
-                    _image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-                    success = True
-                else:
-                    return jsonify({"message": "file type not allowed"})
-
-                if success:
-                    resp = jsonify({'message': 'File successfully uploaded'})
-                    resp.status_code = 201
-                    return resp
-            else:
+            if image and allowed_file(image.filename):
+                filename = secure_filename(image.filename)
+                url_pic = UPLOAD_FOLDER + filename
+                image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+                cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
                 cursor.execute('INSERT INTO property VALUES (NULL, % s, % s, % s, % s, % s, % s, % s)',
-                               (_title, _category, _house_type, _amenity, _county, _price, _image))
+                               (_title, _category, _house_type, _amenity, _county, _price, url_pic))
                 mysql.connection.commit()
-                return jsonify({'message': 'Congratulations, You have successfully added a property'})
+                return 'Congratulations, You have successfully added a property'
+
+            else:
+                return 'Sorry, There was a problem in adding property'
+
 
     except Exception as e:
         print(e)
-
-
-@app.route('/upload_image', methods=['POST', 'GET'])
-def upload_image():
-    if 'image' not in request.files:
-        resp = jsonify({"message": "No file part in the request"})
-        resp.status_code = 400
-        return resp
-
-    image = request.files['image']
-    property_id = request.form['property_id']
-    if image.filename == '':
-        resp = jsonify({'message' : 'No file selected for uploading'})
-        resp.status_code = 400
-        return resp
-
-    if image and allowed_file(image.filename):
-        filename = secure_filename(image.filename)
-        url_pic = UPLOAD_FOLDER + filename
-        print(url_pic)
-        image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        cursor = mysql.connection.cursor(MySQLdb.cursors.DictCursor)
-        cursor.execute('INSERT INTO images VALUES (NULL,% s, % s)',
-                       (url_pic, property_id))
-        mysql.connection.commit()
-        resp = jsonify({'message' : 'File success uploaded'})
-        resp.status_code = 201
-        return resp
-    else:
-        resp = jsonify({'message': 'Allowed file type are checked'})
-        resp.status_code = 400
-        return resp
 
 
 @app.route('/search', methods=['POST', 'GET'])
@@ -267,6 +226,7 @@ def search():
             return jsonify(account)
         else:
             return jsonify({'message': 'The property does not exist'})
+
 
 
 if __name__ == '__main__':
